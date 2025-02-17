@@ -99,26 +99,42 @@ class MetricsTracker:
         
     def save_metrics(self) -> None:
         """Save metrics to disk."""
+        print(f"Debug: Starting metrics save. Current directory: {Path.cwd()}")
+        print(f"Debug: Metrics directory absolute path: {self.metrics_dir.absolute()}")
+        print(f"Debug: Number of metrics to save: {len(self.query_metrics)}")
+        
         if not self.query_metrics:
+            print("Debug: No metrics to save, returning early")
             return
             
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Ensure directory exists
-        self.metrics_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.metrics_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Debug: Created or verified metrics directory: {self.metrics_dir}")
+        except Exception as e:
+            print(f"Debug: Error creating metrics directory: {e}")
+            raise
         
-        # Save query metrics
-        metrics_file = self.metrics_dir / f"query_metrics_{timestamp}.csv"
-        df = pd.DataFrame([vars(m) for m in self.query_metrics])
-        df.to_csv(metrics_file, index=False)
-        
-        # Save usage report
-        report_file = self.metrics_dir / f"usage_report_{timestamp}.json"
-        report = self.get_usage_report()
-        with open(report_file, "w") as f:
-            json.dump(report, f, indent=2)
+        try:
+            # Save query metrics
+            metrics_file = self.metrics_dir / f"query_metrics_{timestamp}.csv"
+            df = pd.DataFrame([vars(m) for m in self.query_metrics])
+            df.to_csv(metrics_file, index=False)
+            print(f"Debug: Successfully wrote CSV to {metrics_file}")
             
-        print(f"Saved metrics to {metrics_file} and {report_file}")
+            # Save usage report
+            report_file = self.metrics_dir / f"usage_report_{timestamp}.json"
+            report = self.get_usage_report()
+            with open(report_file, "w") as f:
+                json.dump(report, f, indent=2)
+            print(f"Debug: Successfully wrote JSON to {report_file}")
+                
+            print(f"Saved metrics to {metrics_file} and {report_file}")
+        except Exception as e:
+            print(f"Debug: Error during file writing: {e}")
+            raise
             
     def clear(self) -> None:
         """Clear all metrics."""

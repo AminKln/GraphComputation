@@ -5,6 +5,7 @@ from pathlib import Path
 
 # Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+print(f"Debug: API BASE_DIR resolved to: {BASE_DIR.absolute()}")
 
 # API Settings
 API_VERSION = "v1"
