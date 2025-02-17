@@ -7,7 +7,8 @@
 #' @param session Shiny session object
 #' @param graph_data Reactive value for graph data
 #' @param visible_graph Reactive value for visible graph data
-handle_graph_visualization <- function(input, output, session, graph_data, visible_graph) {
+#' @param vis_settings Reactive values for visualization settings
+handle_graph_visualization <- function(input, output, session, graph_data, visible_graph, vis_settings) {
   # Initialize snapshot choices when data is loaded
   shiny::observe({
     shiny::req(graph_data())
@@ -249,9 +250,9 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
       )
     ) %>%
       visNetwork::visNodes(
-        size = input$node_size,
+        size = vis_settings$node_size,
         color = list(
-          background = input$node_color,
+          background = vis_settings$node_color,
           border = "#013848",
           highlight = list(
             background = "#FF8000",
@@ -267,7 +268,7 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
       visNetwork::visEdges(
         arrows = list(to = list(enabled = TRUE, scaleFactor = 1)),
         color = list(
-          color = input$edge_color,
+          color = vis_settings$edge_color,
           highlight = "#FF8000"
         ),
         smooth = list(
@@ -292,7 +293,7 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
           enabled = TRUE,
           direction = "UD",
           sortMethod = "directed",
-          levelSeparation = input$level_separation,
+          levelSeparation = vis_settings$level_separation,
           nodeSpacing = 100,
           treeSpacing = 200
         )
@@ -339,27 +340,80 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
     }
   })
   
-  # Add JavaScript handler for node highlighting
-  shiny::insertUI(
-    selector = "head",
-    where = "beforeEnd",
-    ui = tags$script("
-      Shiny.addCustomMessageHandler('visnetwork-highlight', function(message) {
-        var network = document.getElementById('graph_vis').network;
-        if (network && message.node) {
-          network.selectNodes([message.node]);
-          network.focus(message.node, {
-            scale: 1.0,
-            animation: true
-          });
-        }
-      });
-    ")
-  )
-  
   # Update current snapshot text
   output$current_snapshot <- shiny::renderText({
     shiny::req(input$snapshot)
     paste("Current Snapshot:", input$snapshot)
+  })
+  
+  # Add preview visualization
+  output$preview_vis <- renderUI({
+    # Create a simple preview network with synthetic data
+    preview_nodes <- data.frame(
+      id = c(1, 2, 3),
+      label = c("Root", "Child 1", "Child 2"),
+      stringsAsFactors = FALSE
+    )
+    
+    preview_edges <- data.frame(
+      from = c(1, 1),
+      to = c(2, 3),
+      arrows = "to",
+      stringsAsFactors = FALSE
+    )
+    
+    # Create the preview network
+    visNetwork::visNetwork(
+      preview_nodes,
+      preview_edges,
+      width = "100%",
+      height = "200px"
+    ) %>%
+      visNetwork::visNodes(
+        size = vis_settings$node_size,
+        color = list(
+          background = vis_settings$node_color,
+          border = "#013848",
+          highlight = list(
+            background = "#FF8000",
+            border = "#013848"
+          )
+        ),
+        font = list(
+          size = 16,
+          color = "#000000"
+        ),
+        shadow = TRUE
+      ) %>%
+      visNetwork::visEdges(
+        arrows = list(to = list(enabled = TRUE, scaleFactor = 1)),
+        color = list(
+          color = vis_settings$edge_color,
+          highlight = "#FF8000"
+        ),
+        smooth = list(
+          enabled = TRUE,
+          type = "cubicBezier"
+        ),
+        shadow = TRUE
+      ) %>%
+      visNetwork::visLayout(
+        randomSeed = 123,
+        improvedLayout = TRUE,
+        hierarchical = list(
+          enabled = TRUE,
+          direction = "UD",
+          sortMethod = "directed",
+          levelSeparation = vis_settings$level_separation,
+          nodeSpacing = 100,
+          treeSpacing = 200
+        )
+      ) %>%
+      visNetwork::visInteraction(
+        dragNodes = FALSE,
+        dragView = FALSE,
+        zoomView = FALSE,
+        navigationButtons = FALSE
+      )
   })
 } 

@@ -75,53 +75,6 @@ graph_analysis_box <- function() {
             visNetworkOutput("graph_vis", height = "600px")
           )
         )
-      ),
-      # Visualization settings
-      fluidRow(
-        column(
-          width = 3,
-          numericInput(
-            "node_size",
-            "Node Size",
-            value = 25,
-            min = 10,
-            max = 50,
-            step = 5,
-            width = "100%"
-          )
-        ),
-        column(
-          width = 3,
-          div(style = "width: 100%;",
-            colourpicker::colourInput(
-              "node_color",
-              "Node Color",
-              value = "#97C2FC"
-            )
-          )
-        ),
-        column(
-          width = 3,
-          div(style = "width: 100%;",
-            colourpicker::colourInput(
-              "edge_color",
-              "Edge Color",
-              value = "#2B7CE9"
-            )
-          )
-        ),
-        column(
-          width = 3,
-          numericInput(
-            "level_separation",
-            "Level Separation",
-            value = 150,
-            min = 50,
-            max = 300,
-            step = 10,
-            width = "100%"
-          )
-        )
       )
     )
   )
