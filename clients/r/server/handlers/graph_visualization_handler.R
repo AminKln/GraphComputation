@@ -154,61 +154,10 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
               "\n  - Nodes:", length(result$nodes),
               "\n  - Links:", length(result$links))
       
-      # Convert nodes to data frame safely
-      nodes_df <- do.call(rbind, lapply(result$nodes, function(node) {
-        if (is.null(node$id) || is.null(node$weight)) {
-          message("[GRAPH] Invalid node data:", jsonlite::toJSON(node))
-          return(NULL)
-        }
-        data.frame(
-          id = as.character(node$id),
-          label = as.character(node$id),
-          title = paste("<p><b>Node:</b>", node$id,
-                       "<br><b>Weight:</b>", node$weight,
-                       "<br><b>Subgraph Weight:</b>", node$subgraph_weight,
-                       if (!is.null(node$snapshot)) paste("<br><b>Snapshot:</b>", node$snapshot) else "",
-                       "</p>"),
-          weight = as.numeric(node$weight),
-          subgraph_weight = as.numeric(node$subgraph_weight),
-          stringsAsFactors = FALSE
-        )
-      }))
-      
-      # Remove any NULL entries from invalid nodes
-      nodes_df <- nodes_df[!sapply(nodes_df$id, is.null), ]
-      
-      # Convert edges to data frame if they exist
-      edges_df <- if (!is.null(result$links) && length(result$links) > 0) {
-        do.call(rbind, lapply(result$links, function(edge) {
-          if (is.null(edge$source) || is.null(edge$target)) {
-            message("[GRAPH] Invalid edge data:", jsonlite::toJSON(edge))
-            return(NULL)
-          }
-          data.frame(
-            from = as.character(edge$source),
-            to = as.character(edge$target),
-            arrows = "to",
-            stringsAsFactors = FALSE
-          )
-        }))
-      } else {
-        data.frame(
-          from = character(0),
-          to = character(0),
-          arrows = character(0),
-          stringsAsFactors = FALSE
-        )
-      }
-      
-      # Remove any NULL entries from invalid edges
-      if (!is.null(edges_df) && nrow(edges_df) > 0) {
-        edges_df <- edges_df[!sapply(edges_df$from, is.null), ]
-      }
-      
       # Update visible graph with processed data
       visible_graph(list(
-        nodes = nodes_df,
-        edges = edges_df,
+        nodes = result$nodes,
+        edges = result$edges,
         root_id = input$subgraph_root,
         metrics = result$metrics
       ))
@@ -231,17 +180,41 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
     data <- visible_graph()
     
     message("[DEBUG] Rendering visNetwork")
-    message(sprintf("[DEBUG] Nodes: %d", nrow(data$nodes)))
-    message(sprintf("[DEBUG] Edges: %d", nrow(data$edges)))
     
-    if (nrow(data$nodes) == 0) {
+    # Convert list of nodes and edges to data frames
+    nodes_df <- do.call(rbind, lapply(data$nodes, function(x) {
+      data.frame(
+        id = x$id,
+        label = x$label,
+        title = x$title,
+        weight = as.numeric(x$weight),
+        subgraph_weight = as.numeric(x$subgraph_weight),
+        stringsAsFactors = FALSE
+      )
+    }))
+    
+    edges_df <- do.call(rbind, lapply(data$edges, function(x) {
+      data.frame(
+        from = x$from,
+        to = x$to,
+        arrows = "to",
+        stringsAsFactors = FALSE
+      )
+    }))
+    
+    message(sprintf("[DEBUG] Nodes: %d", nrow(nodes_df)))
+    message(sprintf("[DEBUG] Edges: %d", nrow(edges_df)))
+    message("[DEBUG] First node:", paste(capture.output(nodes_df[1,]), collapse = "\n"))
+    message("[DEBUG] First edge:", paste(capture.output(edges_df[1,]), collapse = "\n"))
+    
+    if (nrow(nodes_df) == 0) {
       return(NULL)
     }
     
     # Create the network visualization
     visNetwork::visNetwork(
-      data$nodes,
-      data$edges,
+      nodes_df,
+      edges_df,
       width = "100%",
       height = "600px",
       main = list(

@@ -29,35 +29,41 @@ def format_graph_response(G: nx.DiGraph, node_weight: float, subgraph_weight: fl
         raise ValueError(f"Unsupported format: {format}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
     
     if format in ["d3", "json"]:  # Support both d3 and json as the same format
-        # Get node data
-        nodes = [
-            {
-                "id": n,
-                "weight": G.nodes[n]["weight"],
-                "subgraph_weight": sum(
-                    G.nodes[desc]["weight"] 
-                    for desc in nx.descendants(G, n).union({n})
-                )
-            }
-            for n in G.nodes
-        ]
+        # Create nodes list with proper formatting
+        nodes = []
+        for n in G.nodes:
+            node_data = G.nodes[n]
+            descendants = nx.descendants(G, n).union({n})
+            node_subgraph_weight = sum(float(G.nodes[desc]["weight"]) for desc in descendants)
+            
+            nodes.append({
+                "id": str(n),
+                "label": str(n),
+                "weight": float(node_data["weight"]),
+                "subgraph_weight": node_subgraph_weight,
+                "title": f"<p><b>Node:</b> {n}<br><b>Weight:</b> {node_data['weight']}<br><b>Subgraph Weight:</b> {node_subgraph_weight}</p>"
+            })
         
-        # Get edge data
-        links = [
-            {
-                "source": u,
-                "target": v
-            }
-            for u, v in G.edges
-        ]
+        # Create edges list with proper formatting
+        edges = []
+        for u, v in G.edges:
+            edges.append({
+                "from": str(u),
+                "to": str(v),
+                "arrows": "to"
+            })
+        
+        # Convert to data frames for R
+        nodes_df = pd.DataFrame(nodes)
+        edges_df = pd.DataFrame(edges)
         
         return {
-            "nodes": nodes,
-            "links": links,
+            "nodes": nodes_df.to_dict("records"),
+            "edges": edges_df.to_dict("records"),
             "root_node": {
-                "id": list(G.nodes)[0],
-                "weight": node_weight,
-                "subgraph_weight": subgraph_weight
+                "id": str(list(G.nodes)[0]),
+                "weight": float(node_weight),
+                "subgraph_weight": float(subgraph_weight)
             }
         }
     

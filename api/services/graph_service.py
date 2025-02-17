@@ -109,17 +109,51 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         )
         
         # Calculate metrics for the subgraph
-        try:
-            eigenvector_centrality = list(nx.eigenvector_centrality(subgraph, weight="weight", max_iter=1000).values())
-        except:
-            # If eigenvector centrality fails, use degree centrality as a fallback
-            eigenvector_centrality = list(nx.degree_centrality(subgraph).values())
+        metrics = {
+            "node_metrics": []
+        }
         
-        # Calculate clustering coefficients with error handling
+        # Pre-calculate all centrality metrics
         try:
-            clustering_coeffs = list(nx.clustering(subgraph).values())
+            betweenness = nx.betweenness_centrality(subgraph, weight="weight")
         except:
-            clustering_coeffs = [0] * subgraph.number_of_nodes()
+            betweenness = {node: 0.0 for node in subgraph.nodes()}
+            
+        try:
+            closeness = nx.closeness_centrality(subgraph, distance="weight")
+        except:
+            closeness = {node: 0.0 for node in subgraph.nodes()}
+            
+        try:
+            eigenvector = nx.eigenvector_centrality(subgraph, weight="weight", max_iter=1000)
+        except:
+            eigenvector = {node: 0.0 for node in subgraph.nodes()}
+            
+        try:
+            clustering = nx.clustering(subgraph)
+        except:
+            clustering = {node: 0.0 for node in subgraph.nodes()}
+        
+        # Calculate node metrics
+        for node in subgraph.nodes():
+            node_data = subgraph.nodes[node]
+            descendants = nx.descendants(subgraph, node)
+            descendants.add(node)  # Include the node itself
+            
+            # Calculate subgraph weight
+            node_subgraph_weight = sum(subgraph.nodes[n]["weight"] for n in descendants)
+            
+            # Add metrics to the list
+            metrics["node_metrics"].append({
+                "Node": str(node),
+                "Weight": float(subgraph.nodes[node]["weight"]),
+                "Subgraph_Weight": float(node_subgraph_weight),
+                "Degree": int(subgraph.degree(node)),
+                "Betweenness": float(betweenness[node]),
+                "Closeness": float(closeness[node]),
+                "Eigenvector": float(eigenvector[node]),
+                "ClusteringCoeff": float(clustering[node])
+            })
         
         # Calculate average shortest path with error handling
         try:
@@ -127,28 +161,14 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         except:
             avg_shortest_path = None
         
-        metrics = {
-            "node_metrics": {
-                "Node": list(subgraph.nodes()),
-                "Weight": [subgraph.nodes[n]["weight"] for n in subgraph.nodes()],
-                "Degree": list(dict(subgraph.degree()).values()),
-                "Betweenness": list(nx.betweenness_centrality(subgraph, weight="weight").values()),
-                "Closeness": list(nx.closeness_centrality(subgraph, distance="weight").values()),
-                "Eigenvector": eigenvector_centrality,
-                "ClusteringCoeff": clustering_coeffs
-            },
-            "network_metrics": {
-                "total_nodes": subgraph.number_of_nodes(),
-                "total_edges": subgraph.number_of_edges(),
-                "average_degree": sum(dict(subgraph.degree()).values()) / subgraph.number_of_nodes(),
-                "density": nx.density(subgraph),
-                "average_clustering": sum(clustering_coeffs) / len(clustering_coeffs) if clustering_coeffs else 0,
-                "average_shortest_path": avg_shortest_path
-            }
+        metrics["network_metrics"] = {
+            "total_nodes": subgraph.number_of_nodes(),
+            "total_edges": subgraph.number_of_edges(),
+            "average_degree": sum(dict(subgraph.degree()).values()) / subgraph.number_of_nodes(),
+            "density": nx.density(subgraph),
+            "average_clustering": sum(clustering.values()) / len(clustering) if clustering else 0,
+            "average_shortest_path": avg_shortest_path
         }
-        
-        # Convert node_metrics to a list of dictionaries for easier handling in R
-        metrics["node_metrics"] = pd.DataFrame(metrics["node_metrics"]).to_dict("records")
         
         # Format response
         response = format_graph_response(

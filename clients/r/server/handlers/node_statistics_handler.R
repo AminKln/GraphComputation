@@ -18,34 +18,62 @@ handle_node_statistics <- function(input, output, session, graph_data, visible_g
       return(NULL)
     }
     
-    # Create the table from API metrics
+    # Create the table from API metrics and ensure proper column types
     stats_df <- do.call(rbind.data.frame, data$metrics$node_metrics)
     
+    # Convert columns to proper types
+    stats_df$Node <- as.character(stats_df$Node)
+    stats_df$Weight <- as.numeric(stats_df$Weight)
+    stats_df$Subgraph_Weight <- as.numeric(stats_df$Subgraph_Weight)
+    stats_df$Degree <- as.integer(stats_df$Degree)
+    stats_df$Betweenness <- as.numeric(stats_df$Betweenness)
+    stats_df$Closeness <- as.numeric(stats_df$Closeness)
+    stats_df$Eigenvector <- as.numeric(stats_df$Eigenvector)
+    stats_df$ClusteringCoeff <- as.numeric(stats_df$ClusteringCoeff)
+    
     message("[DEBUG] Available columns in stats_df:", paste(names(stats_df), collapse = ", "))
+    message("[DEBUG] First row of data:", paste(capture.output(stats_df[1,]), collapse = "\n"))
+    
+    # Define column order and display names
+    col_order <- c("Node", "Weight", "Subgraph_Weight", "Degree", 
+                   "Betweenness", "Closeness", "Eigenvector", "ClusteringCoeff")
+    display_names <- c(
+      "Node ID", "Weight", "Subgraph Weight", "Degree",
+      "Betweenness", "Closeness", "Eigenvector", "Clustering Coeff"
+    )
+    
+    # Reorder columns
+    stats_df <- stats_df[, col_order]
     
     # Format the table
-    DT::datatable(
+    dt <- DT::datatable(
       stats_df,
+      rownames = FALSE,  # Disable row numbers at the datatable level
       options = list(
         pageLength = 25,
         scrollX = TRUE,
         order = list(list(1, 'desc')),  # Sort by Weight by default
         dom = 'Bfrtip',
         buttons = c('copy', 'csv', 'excel'),
-        rownames = FALSE  # Remove row numbers
+        rownames = FALSE  # Disable row numbers at the options level
       ),
-      selection = 'single',  # Enable single row selection
+      selection = 'single',
       extensions = 'Buttons',
-      colnames = c(
-        "Node ID", "Weight", "Betweenness", "Closeness", 
-        "Clustering Coeff", "Degree", "Eigenvector"
-      )
-    ) %>%
+      colnames = display_names
+    )
+    
+    # Format numeric columns with appropriate precision
+    dt <- dt %>%
       DT::formatRound(
-        columns = c('Weight', 'Betweenness', 'Closeness', 
-                   'ClusteringCoeff', 'Degree', 'Eigenvector'),
+        columns = c('Weight', 'Subgraph_Weight'),
         digits = 2
+      ) %>%
+      DT::formatRound(
+        columns = c('Betweenness', 'Closeness', 'Eigenvector', 'ClusteringCoeff'),
+        digits = 4
       )
+    
+    dt
   })
   
   # Handle node statistics selection
