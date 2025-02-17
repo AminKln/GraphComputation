@@ -48,29 +48,62 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         # Create graph
         G = nx.DiGraph()
         
+        # If snapshot is provided in params, filter data before creating graph
+        target_snapshot = None
+        if request.params and request.params.get('snapshot'):
+            target_snapshot = request.params['snapshot']
+            vertex_df = vertex_df[vertex_df['snapshot'] == target_snapshot]
+            edge_df = edge_df[edge_df['snapshot'] == target_snapshot]
+        
         # Add nodes with weights
         for _, row in vertex_df.iterrows():
-            G.add_node(row["vertex"], weight=row["weight"])
+            node_id = row["vertex"]
+            G.add_node(
+                node_id,
+                weight=row["weight"],
+                snapshot=row["snapshot"]
+            )
         
         # Add edges
         for _, row in edge_df.iterrows():
-            G.add_edge(row["vertex_from"], row["vertex_to"])
+            # Only add edges if both vertices exist (they should be in the same snapshot)
+            if G.has_node(row["vertex_from"]) and G.has_node(row["vertex_to"]):
+                G.add_edge(row["vertex_from"], row["vertex_to"])
         
-        # If no node_id is provided, use the first node
-        if not request.node_id:
-            request.node_id = list(G.nodes())[0]
+        # Get root node from params or fallback to node_id
+        root_node = None
+        if request.params and request.params.get('root_node'):
+            root_node = request.params['root_node']
+        elif request.node_id:
+            root_node = request.node_id
+        else:
+            root_node = list(G.nodes())[0]
         
         # Get subgraph for requested node
-        if request.node_id not in G:
-            raise ValueError(f"Node {request.node_id} not found in graph")
-            
-        # Get all descendants including the root node
-        descendants = nx.descendants(G, request.node_id)
-        descendants.add(request.node_id)  # Include root node
+        if root_node not in G:
+            raise ValueError(f"Root node {root_node} not found in graph")
+        
+        # Get descendants up to max_depth
+        descendants = set([root_node])  # Start with root node
+        current_level = {root_node}
+        max_depth = request.params.get('max_depth', float('inf')) if request.params else float('inf')
+        
+        # BFS to respect max_depth
+        depth = 0
+        while current_level and (max_depth is None or depth < max_depth):
+            next_level = set()
+            for node in current_level:
+                children = set(G.successors(node))
+                next_level.update(children - descendants)
+            descendants.update(next_level)
+            current_level = next_level
+            depth += 1
+        
+        # Create subgraph with only the nodes up to max_depth
         subgraph = G.subgraph(descendants)
         
         # Calculate weights
-        node_weight = G.nodes[request.node_id]["weight"]
+        node_weight = G.nodes[root_node]["weight"]
         subgraph_weight = sum(
             G.nodes[n]["weight"] for n in subgraph.nodes
         )

@@ -21,7 +21,14 @@ def format_graph_response(G: nx.DiGraph, node_weight: float, subgraph_weight: fl
     Returns:
         Formatted graph data
     """
-    if format == "d3":
+    # Normalize format string
+    format = format.lower()
+    
+    # Validate format
+    if format not in SUPPORTED_FORMATS:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
+    
+    if format in ["d3", "json"]:  # Support both d3 and json as the same format
         # Get node data
         nodes = [
             {
@@ -54,8 +61,12 @@ def format_graph_response(G: nx.DiGraph, node_weight: float, subgraph_weight: fl
             }
         }
     
+    elif format == "csv":
+        return format_csv(G)
+    elif format == "networkx":
+        return format_networkx(G)
     else:
-        raise ValueError(f"Unsupported format: {format}")
+        raise ValueError(f"Format {format} is supported but not implemented")
 
 def format_json(
     graph: nx.DiGraph,

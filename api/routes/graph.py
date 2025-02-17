@@ -44,7 +44,22 @@ def process_graph():
                 data["source"] = SQLSource(**data["source"])
             else:
                 data["source"] = FileSource(**data["source"])
-            request_data = GraphRequest(**data)
+            
+            # Extract params from request data
+            params = data.get('params', {})
+            if params:
+                # Convert max_depth to integer if present
+                if 'max_depth' in params:
+                    params['max_depth'] = int(params['max_depth'])
+            
+            # Create request data with params
+            request_data = GraphRequest(
+                source=data["source"],
+                format=data.get("format", "json"),
+                node_id=data.get("node_id"),
+                params=params
+            )
+            
         except Exception as e:
             logger.error(f"Data validation error: {str(e)}")
             return jsonify({"error": f"Invalid request data: {str(e)}"}), 400

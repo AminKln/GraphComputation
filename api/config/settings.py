@@ -25,8 +25,8 @@ TEMP_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Graph Processing Settings
-DEFAULT_GRAPH_FORMAT = "json"
-SUPPORTED_FORMATS = ["json", "csv", "d3", "networkx"]
+DEFAULT_GRAPH_FORMAT = "d3"
+SUPPORTED_FORMATS = ["d3", "json", "csv", "networkx"]
 
 # Development Settings
 DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
