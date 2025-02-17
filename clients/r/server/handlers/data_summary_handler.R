@@ -81,13 +81,14 @@ handle_data_summary <- function(input, output, session, graph_data) {
     # Create an interactive table
     DT::datatable(
       nodes_df,
+      rownames = FALSE,  # Disable row numbers at the datatable level
       options = list(
         pageLength = 10,
         scrollX = TRUE,
         order = list(list(2, 'desc')),  # Sort by SubgraphWeight by default
         dom = 'Bfrtip',
         buttons = c('copy', 'csv', 'excel'),
-        rownames = FALSE  # Remove row numbers
+        rownames = FALSE  # Disable row numbers at the options level
       ),
       selection = 'single',  # Enable single row selection
       extensions = 'Buttons'
