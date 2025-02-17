@@ -5,25 +5,11 @@
 #' @param dev_mode Boolean indicating if in development mode
 #' @return A shinydashboard box containing data source inputs
 data_source_box <- function(dev_mode = TRUE) {
-  # Default file paths for development
-  project_root <- normalizePath(file.path(getwd(), "..", ".."))
-  vertex_dev_path <- file.path(project_root, "sample_data", "vertices.csv")
-  edge_dev_path <- file.path(project_root, "sample_data", "edges.csv")
-  default_vertex_file <- if (dev_mode) {
-    list(name = "vertices.csv", datapath = vertex_dev_path)
-  } else NULL
-  default_edge_file <- if (dev_mode) {
-    list(name = "edges.csv", datapath = edge_dev_path)
-  } else NULL
-  
   box(
     title = "Data Source",
     width = 12,
     status = "primary",
     solidHeader = TRUE,
-    
-    # Debug text to show input values
-    verbatimTextOutput("data_source_debug"),
     
     # Data source selection
     radioButtons(
@@ -37,20 +23,37 @@ data_source_box <- function(dev_mode = TRUE) {
     # File Upload Panel
     conditionalPanel(
       condition = "input.data_source == 'file'",
-      fileInput(
-        "vertex_file",
-        "Upload Vertex CSV File",
-        accept = c("text/csv", ".csv")
-      ),
-      fileInput(
-        "edge_file",
-        "Upload Edge CSV File",
-        accept = c("text/csv", ".csv")
-      ),
-      checkboxInput(
-        "use_sample_data",
-        "Use sample data",
-        value = TRUE
+      div(
+        style = "border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 15px;",
+        checkboxInput(
+          "use_sample_data",
+          "Use sample data",
+          value = TRUE
+        ),
+        conditionalPanel(
+          condition = "!input.use_sample_data",
+          div(
+            style = "margin-top: 10px;",
+            fileInput(
+              "vertex_file",
+              "Upload Vertex CSV File",
+              accept = c("text/csv", ".csv"),
+              buttonLabel = "Browse...",
+              placeholder = "No file selected"
+            ),
+            fileInput(
+              "edge_file",
+              "Upload Edge CSV File",
+              accept = c("text/csv", ".csv"),
+              buttonLabel = "Browse...",
+              placeholder = "No file selected"
+            ),
+            tags$small(
+              class = "text-muted",
+              "Upload CSV files with required columns: vertex, weight, snapshot for vertices; vertex_from, vertex_to, snapshot for edges"
+            )
+          )
+        )
       )
     ),
     
@@ -80,13 +83,28 @@ data_source_box <- function(dev_mode = TRUE) {
       uiOutput("data_loading_progress")
     ),
     
-    # Debug info
-    tags$script(HTML("
+    # Add JavaScript for file upload validation
+    tags$script("
       $(document).ready(function() {
-        $('#load_data').on('click', function() {
-          console.log('Load data button clicked (jQuery)');
+        // Validate file uploads before loading data
+        $('#load_data').on('click', function(e) {
+          if ($('#data_source input:checked').val() === 'file' && !$('#use_sample_data').prop('checked')) {
+            if (!$('#vertex_file').val() || !$('#edge_file').val()) {
+              e.preventDefault();
+              alert('Please upload both vertex and edge CSV files');
+              return false;
+            }
+          }
+        });
+        
+        // Clear file inputs when switching to sample data
+        $('#use_sample_data').on('change', function() {
+          if ($(this).prop('checked')) {
+            $('#vertex_file').val('');
+            $('#edge_file').val('');
+          }
         });
       });
-    "))
+    ")
   )
 } 

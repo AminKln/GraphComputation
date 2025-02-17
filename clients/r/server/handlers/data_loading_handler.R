@@ -59,16 +59,20 @@ handle_data_loading <- function(input, output, session, graph_data, is_loading) 
     tryCatch({
       # Determine data source paths
       if (input$use_sample_data) {
-        # Use sample data paths from FILE_PATHS
-        vertex_path <- base::normalizePath(base::file.path(getwd(), FILE_PATHS$sample_data$vertices), winslash = "/", mustWork = FALSE)
-        edge_path <- base::normalizePath(base::file.path(getwd(), FILE_PATHS$sample_data$edges), winslash = "/", mustWork = FALSE)
+        # Use sample data paths
+        sample_data_dir <- base::normalizePath(base::file.path(getwd(), "sample_data"), winslash = "/", mustWork = TRUE)
+        vertex_path <- base::file.path(sample_data_dir, "vertices.csv")
+        edge_path <- base::file.path(sample_data_dir, "edges.csv")
         debug_print("Using sample data files:", vertex_path, "and", edge_path)
       } else {
-        # Use project root
-        base_path <- base::normalizePath(base::file.path(getwd(), "..", ".."), winslash = "/", mustWork = FALSE)
-        vertex_path <- base::normalizePath(base::file.path(base_path, "vertices.csv"), winslash = "/", mustWork = FALSE)
-        edge_path <- base::normalizePath(base::file.path(base_path, "edges.csv"), winslash = "/", mustWork = FALSE)
-        debug_print("Using data from project root:", base_path)
+        # Use uploaded files
+        if (is.null(input$vertex_file) || is.null(input$edge_file)) {
+          base::stop("Please upload both vertex and edge CSV files")
+        }
+        
+        vertex_path <- input$vertex_file$datapath
+        edge_path <- input$edge_file$datapath
+        debug_print("Using uploaded files:", vertex_path, "and", edge_path)
       }
       
       progress(20)
