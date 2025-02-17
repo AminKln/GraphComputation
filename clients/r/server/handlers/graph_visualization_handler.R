@@ -49,15 +49,10 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
   # Handle node selection from data table
   shiny::observeEvent(input$selected_node, {
     if (!is.null(input$selected_node)) {
-      # Update the subgraph root with the selected node
-      shiny::updateTextInput(
-        session,
-        "subgraph_root",
-        value = input$selected_node
-      )
-      # Trigger graph render
-      shiny::updateActionButton(session, "render_graph", label = "Render Subgraph")
-      session$sendCustomMessage(type = "shinyjs-click", message = "#render_graph")
+      message("[DEBUG] Node selected from data table:", input$selected_node)
+      # Highlight the selected node in the graph
+      session$sendCustomMessage(type = "visnetwork-highlight", 
+                              message = list(node = input$selected_node))
     }
   })
   
@@ -72,15 +67,7 @@ handle_graph_visualization <- function(input, output, session, graph_data, visib
     }, graph_data()$nodes)
     
     if (length(matching_nodes) > 0) {
-      # Update the subgraph root with the first matching node
-      shiny::updateTextInput(
-        session,
-        "subgraph_root",
-        value = matching_nodes[[1]]$id
-      )
-      # Trigger graph render
-      shiny::updateActionButton(session, "render_graph", label = "Render Subgraph")
-      session$sendCustomMessage(type = "shinyjs-click", message = "#render_graph")
+      message("[DEBUG] Found matching nodes:", length(matching_nodes))
     }
   })
   

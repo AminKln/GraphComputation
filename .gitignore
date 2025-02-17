@@ -62,7 +62,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Data and Output
-data/
 output/
 temp/
 uploads/

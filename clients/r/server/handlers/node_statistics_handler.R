@@ -177,6 +177,10 @@ handle_node_statistics <- function(input, output, session, graph_data, visible_g
         # Highlight the selected node in the graph
         session$sendCustomMessage(type = "visnetwork-highlight", 
                                 message = list(node = selected_node))
+        
+        # Focus on the node in the graph
+        session$sendCustomMessage(type = "visnetwork-focus", 
+                                message = list(node = selected_node))
       }
     }
   })
@@ -195,6 +199,20 @@ handle_node_statistics <- function(input, output, session, graph_data, visible_g
         $(document).on('click', '#set_root_node', function() {
           Shiny.setInputValue('set_root_node', Math.random());
         });
+      });
+      
+      // Add custom message handler for focusing on nodes
+      Shiny.addCustomMessageHandler('visnetwork-focus', function(message) {
+        var network = document.getElementById('graph_vis').network;
+        if (network && message.node) {
+          network.focus(message.node, {
+            scale: 1.0,
+            animation: {
+              duration: 500,
+              easingFunction: 'easeInOutQuad'
+            }
+          });
+        }
       });
     ")
   )
