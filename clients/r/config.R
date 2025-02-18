@@ -15,43 +15,6 @@ options(
   )
 )
 
-#' Main Configuration
-CONFIG <- list(
-  # API settings
-  api = list(
-    base_url = "http://localhost:5000",
-    timeout = 30,
-    retry_attempts = 3,
-    retry_delay = 1
-  ),
-  
-  # File paths
-  paths = list(
-    sample_data_path = "sample_data",
-    logs_path = "logs",
-    temp_path = "temp"
-  ),
-  
-  # UI settings
-  ui = UI_CONFIG,
-  
-  # Logging settings
-  logging = LOG_CONFIG
-)
-
-#' API Configuration (for backward compatibility)
-API_CONFIG <- CONFIG$api
-
-#' File paths
-FILE_PATHS <- list(
-  sample_data = list(
-    vertices = file.path(CONFIG$paths$sample_data_path, "vertices.csv"),
-    edges = file.path(CONFIG$paths$sample_data_path, "edges.csv")
-  ),
-  logs = CONFIG$paths$logs_path,
-  temp = CONFIG$paths$temp_path
-)
-
 #' UI Configuration
 UI_CONFIG <- list(
   # Graph visualization settings
@@ -102,6 +65,43 @@ LOG_CONFIG <- list(
   file = "logs/app.log",
   max_size = 5 * 1024^2,  # 5MB
   max_files = 5
+)
+
+#' Main Configuration
+CONFIG <- list(
+  # API settings
+  api = list(
+    base_url = "http://localhost:5000",
+    timeout = 30,
+    retry_attempts = 3,
+    retry_delay = 1
+  ),
+  
+  # File paths
+  paths = list(
+    sample_data_path = "sample_data",
+    logs_path = "logs",
+    temp_path = "temp"
+  ),
+  
+  # UI settings
+  ui = UI_CONFIG,
+  
+  # Logging settings
+  logging = LOG_CONFIG
+)
+
+#' API Configuration (for backward compatibility)
+API_CONFIG <- CONFIG$api
+
+#' File paths
+FILE_PATHS <- list(
+  sample_data = list(
+    vertices = file.path(CONFIG$paths$sample_data_path, "vertices.csv"),
+    edges = file.path(CONFIG$paths$sample_data_path, "edges.csv")
+  ),
+  logs = CONFIG$paths$logs_path,
+  temp = CONFIG$paths$temp_path
 )
 
 #' Create required directories
