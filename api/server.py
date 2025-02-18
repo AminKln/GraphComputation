@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from waitress import serve
 
+from api import create_app
 from api.data.models import FileSource, GraphRequest, SQLSource
 from api.services.graph_service import process_graph_data
 from api.utils.logging import logger, setup_logging
@@ -10,8 +11,8 @@ from api.utils.metrics import metrics
 # Initialize logging
 setup_logging()
 
-app = Flask(__name__)
-CORS(app)
+# Create Flask app using factory function
+app = create_app()
 
 # Log application startup
 logger.api_logger.info("API Server starting up...")

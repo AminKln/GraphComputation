@@ -25,54 +25,97 @@ def format_graph_response(G: nx.DiGraph, node_weight: float, subgraph_weight: fl
     format = format.lower()
     
     # Validate format
-    if format not in SUPPORTED_FORMATS:
-        raise ValueError(f"Unsupported format: {format}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
+    supported_formats = ["d3", "json", "csv", "networkx"]
+    if format not in supported_formats:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are: {', '.join(supported_formats)}")
     
     if format in ["d3", "json"]:  # Support both d3 and json as the same format
+        # Find the true root node (node with no incoming edges)
+        root_candidates = [n for n in G.nodes() if G.in_degree(n) == 0]
+        if not root_candidates:
+            # If no node has 0 in-degree, use the node with highest out-degree
+            root_candidates = [max(G.nodes(), key=lambda n: G.out_degree(n))]
+        root_node = root_candidates[0]
+        
+        # Calculate depth using BFS
+        depths = nx.shortest_path_length(G, root_node)
+        max_depth = max(depths.values()) if depths else 0
+        
         # Create nodes list with proper formatting
         nodes = []
         for n in G.nodes:
             node_data = G.nodes[n]
             descendants = nx.descendants(G, n).union({n})
-            node_subgraph_weight = sum(float(G.nodes[desc]["weight"]) for desc in descendants)
+            node_subgraph_weight = sum(float(G.nodes[desc].get("weight", 0.0)) for desc in descendants)
             
-            nodes.append({
+            # Calculate node metrics
+            node = {
                 "id": str(n),
-                "label": str(n),
-                "weight": float(node_data["weight"]),
+                "label": str(n),  # Required by visNetwork
+                "title": f"<p><b>Node:</b> {n}<br><b>Weight:</b> {node_data.get('weight', 0.0)}<br><b>Depth:</b> {depths.get(n, 0)}</p>",  # Tooltip
+                "weight": float(node_data.get("weight", 0.0)),
                 "subgraph_weight": node_subgraph_weight,
-                "title": f"<p><b>Node:</b> {n}<br><b>Weight:</b> {node_data['weight']}<br><b>Subgraph Weight:</b> {node_subgraph_weight}</p>"
-            })
+                "depth": depths.get(n, 0),
+                "is_root": n == root_node,
+                "level": depths.get(n, 0)  # For hierarchical layout
+            }
+            nodes.append(node)
         
-        # Create edges list with proper formatting
-        edges = []
-        for u, v in G.edges:
-            edges.append({
-                "from": str(u),
-                "to": str(v),
-                "arrows": "to"
-            })
-        
-        # Convert to data frames for R
-        nodes_df = pd.DataFrame(nodes)
-        edges_df = pd.DataFrame(edges)
+        # Create edges list with proper formatting for visNetwork
+        links = [
+            {
+                "from": str(u),  # visNetwork expects "from" instead of "source"
+                "to": str(v),    # visNetwork expects "to" instead of "target"
+                "arrows": "to"   # Add arrow styling
+            }
+            for u, v in G.edges()
+        ]
         
         return {
-            "nodes": nodes_df.to_dict("records"),
-            "edges": edges_df.to_dict("records"),
-            "root_node": {
-                "id": str(list(G.nodes)[0]),
-                "weight": float(node_weight),
-                "subgraph_weight": float(subgraph_weight)
-            }
+            "nodes": nodes,
+            "edges": links,  # visNetwork expects "edges" instead of "links"
+            "root_node": str(root_node),
+            "node_weight": node_weight,
+            "subgraph_weight": subgraph_weight,
+            "format": format
         }
     
     elif format == "csv":
-        return format_csv(G)
+        # Convert to CSV format
+        nodes_df = pd.DataFrame([
+            {
+                "node": n,
+                "weight": G.nodes[n].get("weight", 0.0),
+                "in_degree": G.in_degree(n),
+                "out_degree": G.out_degree(n)
+            }
+            for n in G.nodes()
+        ])
+        
+        edges_df = pd.DataFrame([
+            {
+                "source": u,
+                "target": v
+            }
+            for u, v in G.edges()
+        ])
+        
+        return {
+            "nodes": nodes_df.to_csv(index=False),
+            "edges": edges_df.to_csv(index=False),
+            "format": format
+        }
+    
     elif format == "networkx":
-        return format_networkx(G)
-    else:
-        raise ValueError(f"Format {format} is supported but not implemented")
+        # Return NetworkX compatible format
+        return {
+            "nodes": list(G.nodes(data=True)),
+            "edges": list(G.edges(data=True)),
+            "format": format
+        }
+    
+    # Should never reach here due to format validation
+    raise ValueError(f"Unsupported format: {format}")
 
 def format_json(
     graph: nx.DiGraph,

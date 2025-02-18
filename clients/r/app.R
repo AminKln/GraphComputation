@@ -47,11 +47,28 @@ source("ui/main_ui.R")
 source("server/main_server.R")
 
 # Configure Shiny options for better connection handling
-options(shiny.maxRequestSize = 100*1024^2)  # Set max request size to 100MB
+options(shiny.maxRequestSize = 500*1024^2)  # Increase max request size to 500MB
 options(shiny.websocket.timeout = 3600)     # Set WebSocket timeout to 1 hour
 options(shiny.autoreload = TRUE)            # Enable auto-reload on disconnect
 options(shiny.launch.browser = TRUE)        # Ensure browser launches
 options(shiny.reconnect = TRUE)             # Enable reconnection
+
+# Configure DT options for better performance
+options(DT.options = list(
+  pageLength = 25,
+  lengthMenu = list(c(25, 50, 100, -1), c('25', '50', '100', 'All')),
+  processing = TRUE,
+  serverSide = TRUE,
+  scrollX = TRUE,
+  scrollY = "400px",
+  scroller = TRUE,
+  deferRender = TRUE
+))
+
+# Configure memory limits for R
+if (.Platform$OS.type == "windows") {
+  memory.limit(size = 8000)  # Set memory limit to 8GB on Windows
+}
 
 # Create and run the Shiny application
 app <- shinyApp(ui = ui(), server = server)

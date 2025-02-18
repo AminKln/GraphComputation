@@ -114,8 +114,8 @@ handle_data_loading <- function(input, output, session, graph_data, is_loading) 
       # Convert to the format expected by the API and visNetwork
       nodes <- base::lapply(base::seq_len(base::nrow(vertex_data)), function(i) {
         base::list(
-          vertex = base::as.character(vertex_data$vertex[i]),  # Keep original vertex column
-          id = base::as.character(vertex_data$vertex[i]),      # Add id for visNetwork
+          vertex = base::as.character(vertex_data$vertex[i]),
+          id = base::as.character(vertex_data$vertex[i]),
           weight = vertex_data$weight[i],
           snapshot = base::as.character(vertex_data$snapshot[i])
         )
@@ -123,10 +123,10 @@ handle_data_loading <- function(input, output, session, graph_data, is_loading) 
       
       links <- base::lapply(base::seq_len(base::nrow(edge_data)), function(i) {
         base::list(
-          vertex_from = base::as.character(edge_data$vertex_from[i]),  # Keep original vertex_from column
-          vertex_to = base::as.character(edge_data$vertex_to[i]),      # Keep original vertex_to column
-          source = base::as.character(edge_data$vertex_from[i]),       # Add source for visNetwork
-          target = base::as.character(edge_data$vertex_to[i]),         # Add target for visNetwork
+          vertex_from = base::as.character(edge_data$vertex_from[i]),
+          vertex_to = base::as.character(edge_data$vertex_to[i]),
+          source = base::as.character(edge_data$vertex_from[i]),
+          target = base::as.character(edge_data$vertex_to[i]),
           snapshot = base::as.character(edge_data$snapshot[i])
         )
       })
@@ -145,14 +145,105 @@ handle_data_loading <- function(input, output, session, graph_data, is_loading) 
       
       # Store the data
       graph_data(result)
-      data_loaded(TRUE)
       
-      progress(90)
+      progress(85)
+      
+      # Get initial snapshot
+      initial_snapshot <- base::sort(base::unique(vertex_data$snapshot))[1]
+      debug_print("Initial snapshot:", initial_snapshot)
       
       # Update UI elements
       shiny::updateSelectInput(session, "snapshot",
-                               choices = base::sort(base::unique(vertex_data$snapshot)),
-                               selected = base::sort(base::unique(vertex_data$snapshot))[1])
+                             choices = base::sort(base::unique(vertex_data$snapshot)),
+                             selected = initial_snapshot)
+      
+      progress(90)
+      
+      # Get root node from API for initial snapshot
+      tryCatch({
+        debug_print("Getting initial root node from API")
+        
+        # Prepare request body
+        request_body <- list(
+          source = list(
+            type = "file",
+            vertex_data = nodes,
+            edge_data = links
+          ),
+          snapshot = initial_snapshot
+        )
+        
+        # Log request details (concise)
+        debug_print("Making API request to:", paste0(API_CONFIG$base_url, "/api/v1/graph_metrics"))
+        
+        response <- httr::POST(
+          paste0(API_CONFIG$base_url, "/api/v1/graph_metrics"),
+          body = request_body,
+          encode = "json"
+        )
+        
+        # Log response status
+        debug_print("Response status:", httr::status_code(response))
+        
+        if (!httr::http_error(response)) {
+          metrics <- jsonlite::fromJSON(
+            httr::content(response, "text", encoding = "UTF-8"),
+            simplifyVector = FALSE
+          )
+          
+          # Log only essential metrics info
+          debug_print("Received metrics - Root node:", metrics$root_node, 
+                     "Total nodes:", metrics$total_nodes,
+                     "Total edges:", metrics$total_edges)
+          
+          # Set initial root node and depth
+          if (!is.null(metrics$root_node)) {
+            debug_print("Setting initial root node to:", metrics$root_node)
+            
+            # First set the max depth
+            shiny::updateSliderInput(
+              session,
+              "max_depth",
+              value = 5
+            )
+            
+            # Then update root node input
+            shiny::updateTextInput(
+              session,
+              "subgraph_root",
+              value = metrics$root_node
+            )
+            
+            # Update button label
+            shiny::updateActionButton(
+              session,
+              "render_graph",
+              label = "Render Subgraph"
+            )
+            
+            # Set data loaded state after everything is set up
+            data_loaded(TRUE)
+          } else {
+            debug_print("No root node found in metrics")
+            shiny::showNotification(
+              "Could not determine root node from graph metrics",
+              type = "error"
+            )
+          }
+        } else {
+          debug_print("Error response from API:", httr::content(response, "text", encoding = "UTF-8"))
+          shiny::showNotification(
+            "Error getting graph metrics from API",
+            type = "error"
+          )
+        }
+      }, error = function(e) {
+        debug_print("Error getting initial root node:", e$message)
+        shiny::showNotification(
+          paste("Error getting root node:", e$message),
+          type = "error"
+        )
+      })
       
       progress(100)
       debug_print("Data loading completed successfully")

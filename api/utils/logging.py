@@ -115,6 +115,14 @@ class APILogger:
         
         return logger
     
+    def info(self, message: str) -> None:
+        """Log info message to API logger."""
+        self.api_logger.info(message)
+    
+    def error(self, message: str, exc_info: bool = False) -> None:
+        """Log error message to error logger."""
+        self.error_logger.error(message, exc_info=exc_info)
+    
     def log_request(self, req: Request, duration: float) -> None:
         """Log API request with metrics."""
         endpoint = req.endpoint or "unknown"

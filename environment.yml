@@ -15,6 +15,7 @@ dependencies:
   - flask>=2.0.0
   - pyodbc>=4.0.35
   - sqlalchemy>=2.0.0
+  - scipy>=1.11.0
   - pip:
     - black>=22.0.0
     - pylint>=2.14.0

@@ -19,7 +19,7 @@ data_summary_box <- function() {
         ),
         div(
           style = "overflow-x: auto;",
-          dataTableOutput("data_summary_table")
+          DTOutput("data_summary_table")
         )
       )
     )
