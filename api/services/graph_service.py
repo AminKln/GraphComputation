@@ -161,7 +161,12 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         # Ensure graph is not empty
         if not G.nodes():
             raise ValueError("No valid nodes found in the graph")
-        
+            
+        # Check if graph is connected (one component)
+        if not nx.is_weakly_connected(G):
+            components = list(nx.weakly_connected_components(G))
+            raise ValueError(f"Graph must have exactly one component. Found {len(components)} components.")
+            
         # Get root node from params or fallback to node_id
         root_node = None
         if request.params and request.params.get('root_node'):
@@ -169,20 +174,44 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         elif request.node_id:
             root_node = str(request.node_id).strip()  # Ensure root node is string and trimmed
         else:
-            # Find the node with the highest out-degree as default root
-            root_node = max(G.nodes(), key=lambda n: G.out_degree(n))
+            # For trees, prefer nodes with no incoming edges
+            root_candidates = [n for n in G.nodes() if G.in_degree(n) == 0]
+            if root_candidates:
+                # If we have nodes with no incoming edges, use the one with highest out-degree
+                root_node = max(root_candidates, key=lambda n: G.out_degree(n))
+            else:
+                # For general graphs, use node with highest out-degree
+                root_node = max(G.nodes(), key=lambda n: G.out_degree(n))
         
         print(f"\nUsing root node: {root_node}")
         
         # Get subgraph for requested node
         if root_node not in G:
             raise ValueError(f"Root node {root_node} not found in graph")
-        
+            
+        # Validate weights before using them
+        for node in G.nodes():
+            weight = G.nodes[node].get("weight")
+            if weight is not None:
+                try:
+                    G.nodes[node]["weight"] = float(weight)
+                    if G.nodes[node]["weight"] <= 0:
+                        G.nodes[node]["weight"] = 1.0  # Use default weight for non-positive values
+                except (ValueError, TypeError):
+                    G.nodes[node]["weight"] = 1.0  # Use default weight for invalid values
+            else:
+                G.nodes[node]["weight"] = 1.0  # Use default weight if none provided
+                
         # Get descendants up to max_depth
         descendants = set([root_node])  # Start with root node
         current_level = {root_node}
-        max_depth = int(request.params.get('max_depth', float('inf'))) if request.params else float('inf')
-        
+        try:
+            max_depth = int(request.params.get('max_depth', float('inf'))) if request.params else float('inf')
+            if max_depth < 0:
+                raise ValueError("max_depth must be non-negative")
+        except (ValueError, TypeError):
+            raise ValueError("Invalid max_depth parameter")
+            
         # BFS to respect max_depth
         depth = 0
         while current_level and (max_depth is None or depth < max_depth):
@@ -193,24 +222,31 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
             descendants.update(next_level)
             current_level = next_level
             depth += 1
-        
+            
         # Create subgraph with only the nodes up to max_depth
-        subgraph = G.subgraph(descendants)
+        subgraph = G.subgraph(descendants).copy()  # Create a copy to avoid view issues
         
+        if not subgraph.nodes():
+            raise ValueError("Resulting subgraph is empty")
+            
         print(f"\nCreated subgraph with {len(subgraph.nodes())} nodes and {len(subgraph.edges())} edges")
         
         # Calculate weights
-        node_weight = float(G.nodes[root_node]["weight"])  # Ensure weight is float
-        subgraph_weight = sum(
-            float(G.nodes[n]["weight"]) for n in subgraph.nodes  # Ensure weights are floats
-        )
-        
+        try:
+            node_weight = float(G.nodes[root_node]["weight"])  # Ensure weight is float
+            subgraph_weight = sum(
+                float(G.nodes[n]["weight"]) for n in subgraph.nodes  # Ensure weights are floats
+            )
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid weight values in graph: {str(e)}")
+            
         # Calculate subgraph metrics
         subgraph_metrics = {
             "total_nodes": subgraph.number_of_nodes(),
             "total_edges": subgraph.number_of_edges(),
             "root_node": str(root_node),  # Ensure root node is string
             "depth": depth,  # Use the actual depth from BFS
+            "is_tree": nx.is_tree(subgraph.to_undirected()),  # Check if it's a tree
             "additional_metrics": {
                 "density": float(nx.density(subgraph))  # Ensure density is float
             }
@@ -220,27 +256,53 @@ def process_graph_data(request: GraphRequest) -> Dict[str, Any]:
         node_metrics = []
         for node in subgraph.nodes():
             node_data = subgraph.nodes[node]
-            descendants = nx.descendants(subgraph, node).union({node})
-            subgraph_weight = sum(float(subgraph.nodes[desc].get("weight", 0.0)) for desc in descendants)
-            
-            # Calculate centrality metrics
-            degree = subgraph.degree(node)
-            betweenness = nx.betweenness_centrality(subgraph, normalized=True).get(node, 0.0)
-            closeness = nx.closeness_centrality(subgraph).get(node, 0.0)
-            eigenvector = nx.eigenvector_centrality_numpy(subgraph, weight="weight").get(node, 0.0)
-            clustering = nx.clustering(subgraph, node)
-            
-            node_metrics.append({
-                "Node": str(node),
-                "Weight": float(node_data.get("weight", 0.0)),
-                "Subgraph_Weight": float(subgraph_weight),
-                "Degree": int(degree),
-                "Betweenness": float(betweenness),
-                "Closeness": float(closeness),
-                "Eigenvector": float(eigenvector),
-                "ClusteringCoeff": float(clustering)
-            })
-        
+            try:
+                # Get node descendants safely
+                node_descendants = nx.descendants(subgraph, node).union({node})
+                subgraph_weight = sum(float(subgraph.nodes[desc].get("weight", 1.0)) for desc in node_descendants)
+                
+                # Calculate centrality metrics with error handling
+                degree = subgraph.degree(node)
+                
+                try:
+                    betweenness = nx.betweenness_centrality(subgraph, normalized=True).get(node, 0.0)
+                except:
+                    betweenness = 0.0
+                    
+                try:
+                    closeness = nx.closeness_centrality(subgraph).get(node, 0.0)
+                except:
+                    closeness = 0.0
+                    
+                try:
+                    # Try different eigenvector centrality methods
+                    try:
+                        eigenvector = nx.eigenvector_centrality_numpy(subgraph).get(node, 0.0)
+                    except:
+                        eigenvector = nx.eigenvector_centrality(subgraph, max_iter=1000).get(node, 0.0)
+                except:
+                    # Fallback to degree centrality if eigenvector fails
+                    eigenvector = nx.degree_centrality(subgraph).get(node, 0.0)
+                    
+                try:
+                    clustering = nx.clustering(subgraph, node)
+                except:
+                    clustering = 0.0
+                    
+                node_metrics.append({
+                    "Node": str(node),
+                    "Weight": float(node_data.get("weight", 1.0)),
+                    "Subgraph_Weight": float(subgraph_weight),
+                    "Degree": int(degree),
+                    "Betweenness": float(betweenness),
+                    "Closeness": float(closeness),
+                    "Eigenvector": float(eigenvector),
+                    "ClusteringCoeff": float(clustering)
+                })
+            except Exception as e:
+                print(f"Warning: Failed to calculate metrics for node {node}: {str(e)}")
+                continue
+                
         # Add node metrics to the subgraph metrics
         subgraph_metrics["node_metrics"] = node_metrics
         
